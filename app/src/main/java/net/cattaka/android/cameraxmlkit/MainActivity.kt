@@ -5,15 +5,21 @@ package net.cattaka.android.cameraxmlkit
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
 import android.os.HandlerThread
-import android.util.Size
 import android.view.TextureView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraX
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageAnalysisConfig
 import androidx.camera.core.PreviewConfig
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Observer
+import com.google.firebase.ml.vision.text.FirebaseVisionText
+import net.cattaka.android.cameraxmlkit.view.GraphicOverlay
+import net.cattaka.android.cameraxmlkit.view.TextGraphic
 
 // This is an arbitrary number we are using to keep tab of the permission
 // request. Where an app has multiple context for requesting permission,
@@ -26,13 +32,13 @@ private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewFinder: TextureView
+    private lateinit var graphicOverlay: GraphicOverlay
     private var fitPreview: FitPreview? = null
-    private var rotationDegrees = 0
-    private var textureSize = Size(0, 0)
+    private var textAnalyzer = TextAnalyzer()
 
     companion object {
         val analyzerThread = HandlerThread(
-                "LuminosityAnalysis").apply { start() }
+                "CameraXAnalysis").apply { start() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +46,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         viewFinder = findViewById(R.id.view_finder)
+        graphicOverlay = findViewById(R.id.graphic_overlay)
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -53,6 +60,10 @@ class MainActivity : AppCompatActivity() {
         viewFinder.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             fitPreview?.updateTransform()
         }
+
+        textAnalyzer.liveData.observe(this, Observer {
+            processVisionResult(it)
+        })
     }
 
     override fun onRequestPermissionsResult(
@@ -83,64 +94,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
-//        val previewConfig = PreviewConfig.Builder().apply {
-//            setTargetAspectRatio(Rational(1, 1))
-//            setTargetResolution(Size(640, 640))
-//        }.build()
         val previewConfig = PreviewConfig.Builder().build()
 
         fitPreview = FitPreview(viewFinder, previewConfig)
 
-//        val imageCaptureConfig = ImageCaptureConfig.Builder()
-//                .apply {
-//                    setTargetAspectRatio(Rational(1, 1))
-//                    // We don't set a resolution for image capture; instead, we
-//                    // select a capture mode which will infer the appropriate
-//                    // resolution based on aspect ration and requested mode
-//                    setCaptureMode(ImageCapture.CaptureMode.MIN_LATENCY)
-//                }.build()
-
-//        val imageCapture = ImageCapture(imageCaptureConfig)
-//        findViewById<ImageButton>(R.id.capture_button).setOnClickListener {
-//            val file = File(externalMediaDirs.first(),
-//                    "${System.currentTimeMillis()}.jpg")
-//            imageCapture.takePicture(file,
-//                    object : ImageCapture.OnImageSavedListener {
-//                        override fun onError(error: ImageCapture.UseCaseError,
-//                                             message: String, exc: Throwable?) {
-//                            val msg = "Photo capture failed: $message"
-//                            Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-//                            Log.e("CameraXApp", msg)
-//                            exc?.printStackTrace()
-//                        }
-//
-//                        override fun onImageSaved(file: File) {
-//                            val msg = "Photo capture succeeded: ${file.absolutePath}"
-//                            Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-//                            Log.d("CameraXApp", msg)
-//                        }
-//                    })
-//        }
-
         // Setup image analysis pipeline that computes average pixel luminance
-//        val analyzerConfig = ImageAnalysisConfig.Builder().apply {
-//            // Use a worker thread for image analysis to prevent glitches
-//            setCallbackHandler(Handler(analyzerThread.looper))
-//            // In our analysis, we care more about the latest image than
-//            // analyzing *every* image
-//            setImageReaderMode(
-//                    ImageAnalysis.ImageReaderMode.ACQUIRE_LATEST_IMAGE)
-//        }.build()
+        val analyzerConfig = ImageAnalysisConfig.Builder().apply {
+            setCallbackHandler(Handler(analyzerThread.looper))
+            setImageReaderMode(ImageAnalysis.ImageReaderMode.ACQUIRE_LATEST_IMAGE)
+        }.build()
 
         // Build the image analysis use case and instantiate our analyzer
-//        val analyzerUseCase = ImageAnalysis(analyzerConfig).apply {
-//            analyzer = LuminosityAnalyzer()
-//        }
-//
-//        CameraX.bindToLifecycle(
-//                this, preview, imageCapture, analyzerUseCase)
+        val analyzerUseCase = ImageAnalysis(analyzerConfig).apply {
+            analyzer = textAnalyzer
+        }
 
-        CameraX.bindToLifecycle(
-                this, fitPreview)
+        CameraX.bindToLifecycle(this, fitPreview, analyzerUseCase)
+    }
+
+    private fun processVisionResult(texts: FirebaseVisionText) {
+        val blocks = texts.textBlocks
+        if (blocks.size == 0) {
+            Toast.makeText(this, "No text found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        graphicOverlay.clear()
+        for (i in blocks.indices) {
+            val lines = blocks[i].lines
+            for (j in lines.indices) {
+                val elements = lines[j].elements
+                for (k in elements.indices) {
+                    val textGraphic = TextGraphic(graphicOverlay, elements[k])
+                    graphicOverlay.add(textGraphic)
+                }
+            }
+        }
     }
 }
