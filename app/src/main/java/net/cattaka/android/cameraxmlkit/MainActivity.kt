@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Size
 import android.view.TextureView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -17,7 +18,6 @@ import androidx.camera.core.PreviewConfig
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
-import com.google.firebase.ml.vision.text.FirebaseVisionText
 import net.cattaka.android.cameraxmlkit.view.GraphicOverlay
 import net.cattaka.android.cameraxmlkit.view.TextGraphic
 
@@ -94,13 +94,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
-        val previewConfig = PreviewConfig.Builder().build()
+//        val targetResolution = Size(1920, 1080)
+        val targetResolution = Size(800, 600)
+        val previewConfig = PreviewConfig.Builder()
+                .setTargetResolution(targetResolution)
+                .build()
 
         fitPreview = FitPreview(viewFinder, previewConfig)
 
         // Setup image analysis pipeline that computes average pixel luminance
         val analyzerConfig = ImageAnalysisConfig.Builder().apply {
             setCallbackHandler(Handler(analyzerThread.looper))
+            setTargetResolution(targetResolution)
             setImageReaderMode(ImageAnalysis.ImageReaderMode.ACQUIRE_LATEST_IMAGE)
         }.build()
 
@@ -112,8 +117,8 @@ class MainActivity : AppCompatActivity() {
         CameraX.bindToLifecycle(this, fitPreview, analyzerUseCase)
     }
 
-    private fun processVisionResult(texts: FirebaseVisionText) {
-        val blocks = texts.textBlocks
+    private fun processVisionResult(result: TextAnalyzer.TextAnalyzerResult) {
+        val blocks = result.visionText.textBlocks
         if (blocks.size == 0) {
             Toast.makeText(this, "No text found", Toast.LENGTH_SHORT).show()
             return
@@ -129,5 +134,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
+        val imageDegree = fitPreview?.rotationDegrees ?: 0
+        val matrix = TextAnalyzer.calcFitMatrix(result, viewFinder, displayDegree - imageDegree)
+        graphicOverlay.matrix = matrix
     }
 }

@@ -10,8 +10,10 @@ class FitPreview(
         val textureView: TextureView,
         previewConfig: PreviewConfig
 ) : Preview(previewConfig) {
-    private var rotationDegrees = 0
-    private var textureSize = Size(0, 0)
+    var rotationDegrees = 0
+        private set
+    var textureSize = Size(0, 0)
+        private set
 
     init {
         setOnPreviewOutputUpdateListener {
@@ -30,7 +32,7 @@ class FitPreview(
     }
 
     fun updateTransform() {
-        textureView.setTransform(calcFitMatrix(textureSize, textureView))
+        textureView.setTransform(calcFitMatrix(textureSize, textureView, getDisplayDegree(textureView.display)))
     }
 
     companion object {
@@ -44,10 +46,9 @@ class FitPreview(
             }
         }
 
-        fun calcFitMatrix(textureSize: Size, targetView: View): Matrix {
+        fun calcFitMatrix(textureSize: Size, targetView: View, displayDegree: Int): Matrix {
             val matrix = Matrix()
 
-            val displayDegree = getDisplayDegree(targetView.display)
             val oddRotate = (Math.abs(displayDegree / 90) % 2 == 0)
             val w = (if (oddRotate) textureSize.height else textureSize.width).toFloat()
             val h = (if (oddRotate) textureSize.width else textureSize.height).toFloat()
