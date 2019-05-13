@@ -1,4 +1,4 @@
-package net.cattaka.android.cameraxapp
+package net.cattaka.android.cameraxmlkit
 
 import org.junit.Test
 

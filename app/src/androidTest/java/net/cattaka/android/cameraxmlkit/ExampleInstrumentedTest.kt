@@ -1,4 +1,4 @@
-package net.cattaka.android.cameraxapp
+package net.cattaka.android.cameraxmlkit
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

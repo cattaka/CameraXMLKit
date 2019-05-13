@@ -1,4 +1,4 @@
-package net.cattaka.android.cameraxapp
+package net.cattaka.android.cameraxmlkit
 
 // Your IDE likely can auto-import these classes, but there are several
 // different implementations so we list them here to disambiguate

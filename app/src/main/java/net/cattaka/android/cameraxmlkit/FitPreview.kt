@@ -1,4 +1,4 @@
-package net.cattaka.android.cameraxapp
+package net.cattaka.android.cameraxmlkit
 
 import android.graphics.Matrix
 import android.util.Size
