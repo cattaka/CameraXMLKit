@@ -1,0 +1,7 @@
+.google/
+.gradle/
+.idea/
+build/
+capture/
+local.properties
+google-services.json
