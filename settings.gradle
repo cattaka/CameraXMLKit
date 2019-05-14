@@ -1,2 +1,2 @@
 include ':app'
-rootProject.name='CameraX App'
+rootProject.name='CameraX MLKit'

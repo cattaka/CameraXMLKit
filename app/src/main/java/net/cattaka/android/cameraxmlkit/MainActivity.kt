@@ -164,9 +164,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
+        // val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
         val imageDegree = fitPreview?.rotationDegrees ?: 0
-        val matrix = TextAnalyzer.calcFitMatrix(result, viewFinder, displayDegree - imageDegree)
+        val matrix = TextAnalyzer.calcFitMatrix(result, viewFinder, -imageDegree)
         graphicOverlay.matrix = matrix
     }
 
@@ -182,9 +182,9 @@ class MainActivity : AppCompatActivity() {
             graphicOverlay.add(textGraphic)
         }
 
-        val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
+        // val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
         val imageDegree = fitPreview?.rotationDegrees ?: 0
-        val matrix = ObjectAnalyzer.calcFitMatrix(result, viewFinder, displayDegree - imageDegree)
+        val matrix = ObjectAnalyzer.calcFitMatrix(result, viewFinder, -imageDegree)
         graphicOverlay.matrix = matrix
     }
 }
