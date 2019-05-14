@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
 import android.view.TextureView
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraX
@@ -19,6 +20,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
 import net.cattaka.android.cameraxmlkit.view.GraphicOverlay
+import net.cattaka.android.cameraxmlkit.view.ObjectGraphic
 import net.cattaka.android.cameraxmlkit.view.TextGraphic
 
 // This is an arbitrary number we are using to keep tab of the permission
@@ -35,10 +37,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var graphicOverlay: GraphicOverlay
     private var fitPreview: FitPreview? = null
     private var textAnalyzer = TextAnalyzer()
+    private var objectAnalyzer = ObjectAnalyzer()
+    private var analyzerUseCase: ImageAnalysis? = null
 
     companion object {
         val analyzerThread = HandlerThread(
-                "CameraXAnalysis").apply { start() }
+            "CameraXAnalysis"
+        ).apply { start() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +58,8 @@ class MainActivity : AppCompatActivity() {
             viewFinder.post { startCamera() }
         } else {
             ActivityCompat.requestPermissions(
-                    this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
         }
 
         // Every time the provided texture view changes, recompute layout
@@ -64,17 +70,38 @@ class MainActivity : AppCompatActivity() {
         textAnalyzer.liveData.observe(this, Observer {
             processVisionResult(it)
         })
+        objectAnalyzer.liveData.observe(this, Observer {
+            processVisionResult(it)
+        })
+
+        val onCheckedChangeListener = RadioGroup.OnCheckedChangeListener { group, checkedId ->
+            graphicOverlay.clear()
+            analyzerUseCase?.let {
+                when (checkedId) {
+                    R.id.mode_object -> {
+                        it.analyzer = objectAnalyzer
+                    }
+                    R.id.mode_text -> {
+                        it.analyzer = textAnalyzer
+                    }
+                }
+            }
+        }
+        findViewById<RadioGroup>(R.id.mode_group).setOnCheckedChangeListener(onCheckedChangeListener)
     }
 
     override fun onRequestPermissionsResult(
-            requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        requestCode: Int, permissions: Array<String>, grantResults: IntArray
+    ) {
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 viewFinder.post { startCamera() }
             } else {
-                Toast.makeText(this,
-                        "Permissions not granted by the user.",
-                        Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "Permissions not granted by the user.",
+                    Toast.LENGTH_SHORT
+                ).show()
                 finish()
             }
         }
@@ -86,7 +113,9 @@ class MainActivity : AppCompatActivity() {
     private fun allPermissionsGranted(): Boolean {
         for (permission in REQUIRED_PERMISSIONS) {
             if (ContextCompat.checkSelfPermission(
-                            this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    this, permission
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 return false
             }
         }
@@ -97,8 +126,8 @@ class MainActivity : AppCompatActivity() {
 //        val targetResolution = Size(1920, 1080)
         val targetResolution = Size(800, 600)
         val previewConfig = PreviewConfig.Builder()
-                .setTargetResolution(targetResolution)
-                .build()
+            .setTargetResolution(targetResolution)
+            .build()
 
         fitPreview = FitPreview(viewFinder, previewConfig)
 
@@ -110,7 +139,7 @@ class MainActivity : AppCompatActivity() {
         }.build()
 
         // Build the image analysis use case and instantiate our analyzer
-        val analyzerUseCase = ImageAnalysis(analyzerConfig).apply {
+        analyzerUseCase = ImageAnalysis(analyzerConfig).apply {
             analyzer = textAnalyzer
         }
 
@@ -119,10 +148,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun processVisionResult(result: TextAnalyzer.TextAnalyzerResult) {
         val blocks = result.visionText.textBlocks
-        if (blocks.size == 0) {
-            Toast.makeText(this, "No text found", Toast.LENGTH_SHORT).show()
+        if (blocks.isEmpty()) {
             return
         }
+
         graphicOverlay.clear()
         for (i in blocks.indices) {
             val lines = blocks[i].lines
@@ -138,6 +167,24 @@ class MainActivity : AppCompatActivity() {
         val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
         val imageDegree = fitPreview?.rotationDegrees ?: 0
         val matrix = TextAnalyzer.calcFitMatrix(result, viewFinder, displayDegree - imageDegree)
+        graphicOverlay.matrix = matrix
+    }
+
+    private fun processVisionResult(result: ObjectAnalyzer.ObjectAnalyzerResult) {
+        val blocks = result.visionObject
+        if (blocks.isEmpty()) {
+            return
+        }
+
+        graphicOverlay.clear()
+        for (block in blocks) {
+            val textGraphic = ObjectGraphic(graphicOverlay, block)
+            graphicOverlay.add(textGraphic)
+        }
+
+        val displayDegree = FitPreview.getDisplayDegree(viewFinder.display)
+        val imageDegree = fitPreview?.rotationDegrees ?: 0
+        val matrix = ObjectAnalyzer.calcFitMatrix(result, viewFinder, displayDegree - imageDegree)
         graphicOverlay.matrix = matrix
     }
 }
